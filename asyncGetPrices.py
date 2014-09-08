@@ -5,8 +5,8 @@ price server app and return the responses as a list of dicts'''
 import asyncio  
 import aiohttp
 from datetime import datetime
-import numpy as np
-import pandas as pd
+import cleanHistory as ch
+
 
 resList=[]
 
@@ -20,10 +20,16 @@ def fetch_page(url, idx):
     return (r)
 
 def main():  
-    url1 = 'http://yahooserver.herokuapp.com/prices/XOM&1000'
-    url2 = 'http://yahooserver.herokuapp.com/prices/CVX&1000'
-   
-    urls = [url1,url2]
+    url = 'http://yahooserver.herokuapp.com/prices/'
+    tickers = ['XOM','CVX']
+    nPrices = 500
+
+
+    urls=[]
+
+    for each in tickers:
+    	s = url+each+'&'+str(nPrices)
+    	urls.append(s)
 
     coros = []
     for idx, url in enumerate(urls):
@@ -38,6 +44,9 @@ if __name__ == '__main__':
     loop.run_until_complete(main())
     print('Response took: ', datetime.now()-t, 'seconds.')
 
-    # for each in resList:
-	   #  print(each)
+    for each in resList:
+        print(each['Ticker'])
+
+    outFrame = ch.cleaner(resList)
+    print(outFrame)
 
