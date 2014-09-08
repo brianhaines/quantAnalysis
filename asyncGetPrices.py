@@ -22,7 +22,7 @@ def fetch_page(url, idx):
 def main():  
     url = 'http://yahooserver.herokuapp.com/prices/'
     tickers = ['XOM','CVX']
-    nPrices = 500
+    nPrices = 5
 
 
     urls=[]
@@ -48,5 +48,6 @@ if __name__ == '__main__':
         print(each['Ticker'])
 
     outFrame = ch.cleaner(resList)
-    print(outFrame)
+    print(resList)
+    # print(outFrame)
 

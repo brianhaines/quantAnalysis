@@ -7,32 +7,54 @@ import numpy as np
 import pandas as pd
 
 def cleaner(pList):
-    d1=[]
-    v1=[]
-    for i in pList[0]['Prices']:
-        d1.append(i[0]+'T'+i[1])
-        v1.append(i[2])
-        a1 = np.array([d1,v1])
-    df1=pd.DataFrame(a1).T
-
-    d2=[]
-    v2=[]
-    for i in pList[1]['Prices']:
-        d2.append(i[0]+'T'+i[1])
-        v2.append(i[2])
-        a2 = np.array([d2,v2])
-
-    df2=pd.DataFrame(a2).T
+    if len(pList)<2:
+        raise Exception("Need at least two stocks!")
     
-    df1.columns = df2.columns = ['t','v']
+    labels = ['DateTime']
 
-    dfOut = pd.DataFrame(np.array(df1.merge(df2, on='t', how='outer').sort('t'),),columns=['time',pList[0]['Ticker'],pList[1]['Ticker']])
+    for sid, series in enumerate(pList):
+        if sid == 0:
+            #Make the initial series
+            d1=[]
+            v1=[]
+            for i in series['Prices']:
+                d1.append(i[0]+'T'+i[1])
+                v1.append(i[2])
+                a1 = np.array([d1,v1])
+            dfOut=pd.DataFrame(a1).T
+            labels.append(series['Ticker'])
+            dfOut.columns = ['DateTime',series['Ticker']]            
+        elif sid > 0:
+            #Make a new dataframe for each subsequent series
+            dN=[]
+            vN=[]
+            for i in series['Prices']:
+                dN.append(i[0]+'T'+i[1])
+                vN.append(i[2])
+                aN = np.array([dN,vN])
+            dfN=pd.DataFrame(aN).T
+            labels.append(series['Ticker'])
+            dfN.columns = ['DateTime',series['Ticker']]
+            #Now we have the initial and Nth series in dataframe format
 
-    dfClean = dfOut.dropna(subset = [pList[0]['Ticker'],pList[1]['Ticker']])
+            # This will merge the Nth df with the initial df
+            dfOut = pd.DataFrame(np.array(dfOut.merge(dfN, on='DateTime', how='outer').sort('DateTime'),),columns=labels)
 
-    dfClean[[pList[0]['Ticker'],pList[1]['Ticker']]] = dfClean[[pList[0]['Ticker'],pList[1]['Ticker']]].astype(float)
+    # All of the stocks have been added to the dataframe, now clean it up
+    dfClean = dfOut.dropna()
+    
+    labels.pop(0)
+    dfClean[labels] = dfClean[labels].astype(float) #This raises a soft warning.
+    #Trying to change price values dtype to float. The line above works but raises and error:
+    #     "A value is trying to be set on a copy of a slice from a DataFrame.
+    #     "Try using .loc[row_index,col_indexer] = value instead
+    # Below are attempts to reassign dtypes without getting an error.
     # print(dfClean.dtypes)
+    # dfClean.loc[dfClean[:,labels]] = dfClean[:,labels].astype(float)
+    # dfClean.iloc[dfClean[:,:]].astype(float)
+    # dfClean.loc[dfClean[:,labels]].astype(float)
+    # print(dfClean.dtypes)
+        
     # dfClean['diff'] = dfClean[pList[1]['Ticker']].sub(dfClean[pList[0]['Ticker']], axis=0)    
 
     return(dfClean)
-    print((datetime.now()-t)/10)
