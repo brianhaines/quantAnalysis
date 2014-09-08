@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 from datetime import datetime
 import cleanHistory as ch
+import pandas as pd
 
 
 resList=[]
@@ -21,9 +22,8 @@ def fetch_page(url, idx):
 
 def main():  
     url = 'http://yahooserver.herokuapp.com/prices/'
-    tickers = ['XOM','CVX']
-    nPrices = 5
-
+    tickers = ['XOM','CVX','BP','SPY','XLE']
+    nPrices = 2000
 
     urls=[]
 
@@ -48,6 +48,10 @@ if __name__ == '__main__':
         print(each['Ticker'])
 
     outFrame = ch.cleaner(resList)
-    print(resList)
-    # print(outFrame)
+    
+    # print(len(resList))
+    # for each in resList:
+    # 	print(each)
+    print(outFrame)
+    print(len(outFrame))
 
