@@ -18,9 +18,9 @@ def cleaner(pList):
             d1=[]
             v1=[]
             for i in series['Prices']:
-                d1.append(i[0]+'T'+i[1])
+                d1.append(''.join([i[0],'T',i[1]]))
                 v1.append(i[2])
-                a1 = np.array([d1,v1])
+            a1 = np.array([d1,v1])
             dfOut=pd.DataFrame(a1).T
             labels.append(series['Ticker'])
             dfOut.columns = ['DateTime',series['Ticker']]            
@@ -29,9 +29,9 @@ def cleaner(pList):
             dN=[]
             vN=[]
             for i in series['Prices']:
-                dN.append(i[0]+'T'+i[1])
+                dN.append(''.join([i[0],'T',i[1]]))
                 vN.append(i[2])
-                aN = np.array([dN,vN])
+            aN = np.array([dN,vN])
             dfN=pd.DataFrame(aN).T
             labels.append(series['Ticker'])
             dfN.columns = ['DateTime',series['Ticker']]
@@ -45,7 +45,7 @@ def cleaner(pList):
     
     labels.pop(0)
     dfClean[labels] = dfClean[labels].astype(float) #This raises a soft warning.
-    #Trying to change price values dtype to float. The line above works but raises and error:
+    #Trying to change price values dtype to float. The line above works but raises an error:
     #     "A value is trying to be set on a copy of a slice from a DataFrame.
     #     "Try using .loc[row_index,col_indexer] = value instead
     # Below are attempts to reassign dtypes without getting an error.
