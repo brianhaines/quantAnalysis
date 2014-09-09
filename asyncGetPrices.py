@@ -7,6 +7,8 @@ import aiohttp
 from datetime import datetime
 import cleanHistory as ch
 import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
 
 
 resList=[]
@@ -23,12 +25,12 @@ def fetch_page(url, idx):
 
 def main():  
     url = 'http://yahooserver.herokuapp.com/prices/'
-    tickers = ['XOM','CVX','BP','SPY','XLE']
-    nPrices = 3000
+    tickers = ['SPY','XOM','CVX']#,'BP','XLE']
+    nPrices = 5000
 
     urls=[]
     for each in tickers:
-    	s = url+each+'&'+str(nPrices)
+    	s = ''.join([url,each,'&',str(nPrices)])
     	urls.append(s)
 
     coros = []
@@ -43,23 +45,29 @@ if __name__ == '__main__':
     loop.run_until_complete(main())
     print('Response took: ', datetime.now()-t, 'seconds.')
 
-    # for each in resList:
-    #     print(each['Ticker'])
-
     #Convert all those numbers to a clean pandas dataFrame
     outFrame = ch.cleaner(resList)
     
-    # Regression
-    # from pandas.stats.api import ols
-    # res = ols(y=outFrame['XOM'],x=outFrame['CVX'])
-    # print(res)
-    # Run some regressions
-    print(outFrame.cov())
-    # print(outFrame)
-    # rollMean = pd.rolling_mean(outFrame['XOM'],60)
-    # pd.rolling_corr(outFrame.XOM,outFrame.CVX,50).plot(style='k')
+    # Construct a regression between two stocks
+    y = outFrame['XOM']
+    x = outFrame['CVX']
+    X = sm.add_constant(x)
+    model = sm.OLS(y, X)
+    OLSresults = model.fit()
 
-    correls = pd.rolling_corr(outFrame.XOM,outFrame.CVX, 50,pairwise=True)
-    print(correls)
-    # print(outFrame.XOM)
-    # print(outFrame.DateTime.min(), rollCorr.min())
+    # Use the beta of the regression to weight the pairs spread calculation
+    diff = outFrame['XOM']-(OLSresults.params[1]*outFrame['CVX'])
+    mean_diff = pd.rolling_mean(diff, 50)
+    mean_diff2 = pd.rolling_mean(diff, 100)
+
+    # print(OLSresults.params[1])
+    print(OLSresults.summary())
+
+    # Error Checking the time series
+    # print(outFrame[['DateTime','XOM']].head())
+    # print(outFrame[['DateTime','XOM']].tail(5))
+
+    # Generate the plots
+    # plt.plot(y,'b--',x,'r--')
+    plt.plot(diff,'b--', mean_diff, 'r--', mean_diff2, 'r-')
+    plt.show()
