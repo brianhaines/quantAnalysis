@@ -15,6 +15,48 @@ from numpy import cumsum, log, polyfit, sqrt, std, subtract
 from numpy.random import randn
 
 resList=[]
+def pairFramer(stk_y,stk_x,window,outFrame):
+
+    pairFrame = pd.DataFrame(index=outFrame.index)
+    pairFrame['DateTime'] = outFrame['DateTime']
+    pairFrame['stk_y'] = outFrame[stk_y]
+    pairFrame['stk_x'] = outFrame[stk_x]
+    pairFrame['stk_y_ret'] = pairFrame['stk_y'][1:]/pairFrame['stk_y'][:-1].values-1
+    pairFrame['stk_x_ret'] = pairFrame['stk_x'][1:]/pairFrame['stk_x'][:-1].values-1
+    
+    for t in range(2): #run it 2x
+        #Remove outlier min returns
+        minRx = pairFrame['stk_x_ret'].idxmin()
+        pairFrame['stk_x_ret'].loc[minRx]=0
+        minRy = pairFrame['stk_y_ret'].idxmin()
+        pairFrame['stk_y_ret'].loc[minRy]=0
+        
+        #Remove outlier max returns
+        maxRx = pairFrame['stk_x_ret'].idxmax()
+        pairFrame['stk_x_ret'].loc[maxRx]=0
+        maxRy = pairFrame['stk_y_ret'].idxmax()
+        pairFrame['stk_y_ret'].loc[maxRy]=0
+    
+    # Rolling linear regression model    
+    model2 = pd.ols(y=pairFrame['stk_y_ret'],x=pairFrame['stk_x_ret'],window=window)
+
+    # Add the hedge ratio to pairFrame
+    ## Because beta is the only result parameter used, the beta identity of:
+    ## Beta = Cov(X,Y)/var(y) can be substituted.
+    pairFrame['hedge_ratio']=model2.beta['x']
+    
+    # A variety of ways to calculate the hedge ratio. Each is less than ideal
+    pairFrame['hedge_ratio'] = pairFrame['hedge_ratio'].iloc[:window+1].mean() 
+    # pairFrame['hedge_ratio'] = pd.rolling_mean(pairFrame['hedge_ratio'],10)
+    # pairFrame['hedge_ratio'] = pd.expanding_mean(pairFrame['hedge_ratio'])
+    
+    #Drop the first N rows which will be NA
+    pairFrame= pairFrame.dropna()
+
+    # Calculate the price spread between the stocks
+    pairFrame['spread'] = pairFrame['stk_y'] - pairFrame['hedge_ratio']*pairFrame['stk_x']
+    pairFrame['z_score'] = (pairFrame['spread'] - pd.rolling_mean(pairFrame['spread'],window=window))/pd.rolling_std(pairFrame['spread'],window=window)
+    return pairFrame
 
 def hurstTest(ts):
     ''' Returns the Hust Exponent of the given time series.'''
@@ -43,8 +85,8 @@ def fetch_page(url, idx):
 
 def main():  
     url = 'http://yahooserver.herokuapp.com/prices/'
-    tickers = ['SPY','XOM','CVX','BP','XLE']
-    nPrices = 8000
+    tickers = ['XLE','XOM','CVX','COP','BP','TOT']
+    nPrices = 10000
 
     urls=[]
     for each in tickers:
@@ -64,41 +106,19 @@ if __name__ == '__main__':
     print('Response took: ', datetime.now()-t, 'seconds.')
 
     #Convert all those numbers to a clean pandas dataFrame
+    print('resList ', len(resList[1]['Prices']))
     outFrame = ch.cleaner(resList)
-    
+    print('outFrame',len(outFrame))
     # Construct a regression between two stocks
-    stk_y = 'XOM'
-    stk_x = 'CVX'
+    stk_y = 'CVX'
+    stk_x = 'COP'
     window = 100
 
     # Make a frame for a pair
-    pairFrame = pd.DataFrame(index=outFrame.index)
-    pairFrame['DateTime'] = outFrame['DateTime']
-    pairFrame['stk_y'] = outFrame[stk_y]
-    pairFrame['stk_x'] = outFrame[stk_x]
-    pairFrame['stk_y_ret'] = pairFrame['stk_y'][1:]/pairFrame['stk_y'][:-1].values-1
-    pairFrame['stk_x_ret'] = pairFrame['stk_x'][1:]/pairFrame['stk_x'][:-1].values-1
+    pf = pairFramer(stk_y=stk_y,stk_x=stk_x,window=window,outFrame=outFrame)
     
-    # Rolling linear regression model    
-    model2 = pd.ols(y=pairFrame['stk_y_ret'],x=pairFrame['stk_x_ret'],window=window)
-
-    # Add the hedge ratio to pairFrame
-    ## Because beta is the only result parameter used, the beta identity of:
-    ## Beta = Cov(X,Y)/var(y) can be substituted.
-    pairFrame['hedge_ratio']=model2.beta['x']
-    pairFrame['hedge_ratio'] = pd.rolling_mean(pairFrame['hedge_ratio'],10)
-    pairFrame= pairFrame.dropna()
-    # Calculate the price spread between the stocks
-    pairFrame['spread'] = pairFrame['stk_y'] - pairFrame['hedge_ratio']*pairFrame['stk_x']
-    pairFrame['z_score'] = (pairFrame['spread'] - pd.rolling_mean(pairFrame['spread'],window=window))/pd.rolling_std(pairFrame['spread'],window=window)
-
-    # Error check the dataFrame
-    print('PairFrame')
-    print(pairFrame.head())
-    print(pairFrame.tail())
-
     # Plot the spread.
-    plt.plot(pairFrame['spread'],'b-',pd.rolling_mean(pairFrame['spread'],window=window),'r--')
+    plt.plot(pf['spread'],'b-',pd.rolling_mean(pf['spread'],window=window),'r--')
 
     # The Statsmodels paradigm for OLS
     y = outFrame[stk_y]
@@ -110,7 +130,7 @@ if __name__ == '__main__':
     # print(OLSresults.summary())
 
     # Adjusted Dickey Fuller test
-    adfOut = ts.adfuller(pairFrame['spread'], 10)  
+    adfOut = ts.adfuller(pf['spread'], 10)  
     print()
     print('Calculated ADF Test Statistic:', adfOut[0])
     for k, v in adfOut[4].items():        
@@ -135,8 +155,14 @@ if __name__ == '__main__':
     print('Hurst(Trending): ',hurstTest(tr))
 
     # Using the spread calculated above in pairFrame
-    print('Hurst(Spread1): ', hurstTest(pairFrame['spread']))
+    print('Hurst(Spread1): ', hurstTest(pf['spread']))
 
+    print(pf.head())
+    print(pf.tail())
+    print(len(pf))
+
+    # print(pairFrame['stk_y_ret'].idxmin(),pairFrame['stk_y_ret'].min())
+    # print(pairFrame.loc[pairFrame['stk_y_ret'].idxmin()])
     # Generate the plots
     # plt.plot(y,'b--',x,'r--')
     # plt.plot(diff,'b--', mean_diff, 'r--', mean_diff2, 'g--')
